@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - CINEDBV</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js" type="module"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cinema: { red: '#8B0000', dark: '#1a0202', gold: '#FFD700' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@300;400;700&display=swap');
+        body { background-color: #0f172a; color: white; font-family: 'Poppins', sans-serif; }
+        h1, h2 { font-family: 'Anton', sans-serif; letter-spacing: 1px; }
+        .input-dark { background: #1e293b; border: 1px solid #334155; color: white; padding: 8px; border-radius: 6px; width: 100%; font-size: 0.9rem; }
+        .input-dark:focus { outline: none; border-color: #FFD700; }
+        .loader-spin { border: 3px solid rgba(255,255,255,0.1); border-left-color: #FFD700; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+    <!-- Navbar -->
+    <nav class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-cinema-red p-2 rounded text-white"><i class="fa-solid fa-lock"></i></div>
+                <h1 class="text-xl text-white">CINEDBV <span class="text-cinema-gold text-sm font-sans font-normal ml-2">Painel de Controlo</span></h1>
+            </div>
+            <div id="statusIndicator" class="text-xs font-bold text-green-500 flex items-center gap-2">
+                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Online
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- Controlo Global -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Timer de Votação -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <h2 class="text-xl mb-4 text-cinema-gold"><i class="fa-regular fa-clock mr-2"></i>Temporizador</h2>
+                <div class="flex gap-4 items-end">
+                    <div class="flex-grow">
+                        <label class="text-xs text-slate-400 uppercase font-bold">Duração (Minutos)</label>
+                        <input type="number" id="timerMinutes" value="10" class="input-dark mt-1">
+                    </div>
+                    <button onclick="startNewVoting()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded transition-colors h-[42px]">
+                        Iniciar Nova Votação
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Ao clicar, reinicia o tempo e abre a votação no site.</p>
+            </div>
+
+            <!-- Ações de Perigo -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <h2 class="text-xl mb-4 text-red-500"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Ações de Risco</h2>
+                <div class="flex gap-4">
+                    <button onclick="resetAllVotes()" class="w-full bg-red-900/50 hover:bg-red-900 border border-red-700 text-red-100 font-bold py-3 rounded transition-colors flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-trash"></i> Zerar Todos os Votos
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Use com cuidado. Apaga a contagem de todos os filmes.</p>
+            </div>
+        </div>
+
+        <!-- Editor de Filmes -->
+        <h2 class="text-2xl mb-6 border-l-4 border-cinema-gold pl-4">Editar Filmes em Cartaz</h2>
+        
+        <div id="moviesEditorGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Os formulários serão gerados aqui -->
+            <div class="col-span-full text-center py-10 text-slate-500">
+                <div class="loader-spin mx-auto mb-2"></div> Carregando filmes...
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded shadow-xl transform translate-y-20 transition-transform duration-300 z-50 flex items-center gap-3">
+        <i class="fa-solid fa-check-circle"></i>
+        <span id="toastMsg">Alterações guardadas!</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, getDocs, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // CORREÇÃO: Adicionado signInWithCustomToken à importação
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Configuração Firebase (Do ambiente)
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = __app_id || 'default-app';
+
+        // Estado Local
+        let movies = [];
+
+        // Inicialização
+        async function init() {
+            // Login simples (Admin deve ser autenticado, mas aqui usamos anónimo para o protótipo funcionar direto)
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+
+            await loadMovies();
+        }
+
+        // Carregar Filmes
+        async function loadMovies() {
+            const moviesRef = collection(db, 'artifacts', appId, 'public', 'data', 'movies');
+            const snap = await getDocs(moviesRef);
+            
+            movies = [];
+            snap.forEach(doc => {
+                movies.push({ id: doc.id, ...doc.data() });
+            });
+
+            // Se não houver filmes no DB, usa padrão e cria
+            if (movies.length === 0) {
+                movies = [
+                    { id: 'movie_1', title: "O Resgate do Soldado Ryan", poster: "https://image.tmdb.org/t/p/w500/z02o4f3eN6r3A5Xj3f5eN6r3A5.jpg", trailer: "zwhP5b4tD6g", desc: "A missão é um homem.", count: 0 },
+                    { id: 'movie_2', title: "A Prova de Fogo", poster: "https://m.media-amazon.com/images/M/MV5BMTM5MzY2ODk4N15BMl5BanBnXkFtZTcwOTE4MTI0MQ@@._V1_.jpg", trailer: "M5l1C0_r6kM", desc: "Nunca deixe seu parceiro para trás.", count: 0 },
+                    { id: 'movie_3', title: "Desafiando Gigantes", poster: "https://m.media-amazon.com/images/M/MV5BMjA5ODQ3MTMyMF5BMl5BanBnXkFtZTcwMjYzNjI3MQ@@._V1_FMjpg_UX1000_.jpg", trailer: "C1d_y5t2w5c", desc: "Nunca desista.", count: 0 },
+                    { id: 'movie_4', title: "Até o Último Homem", poster: "https://m.media-amazon.com/images/M/MV5BMjQ1NjM3MTUxNV5BMl5BanBnXkFtZTgwMDc5MTY5OTE@._V1_.jpg", trailer: "s2-1hz1juBI", desc: "Um herói sem armas.", count: 0 }
+                ];
+                // Salva iniciais
+                const batch = writeBatch(db);
+                movies.forEach(m => {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'movies', m.id);
+                    batch.set(ref, m);
+                });
+                await batch.commit();
+            }
+
+            renderEditor();
+        }
+
+        // Renderiza Editor
+        function renderEditor() {
+            const grid = document.getElementById('moviesEditorGrid');
+            grid.innerHTML = '';
+
+            // Ordena por ID para manter a ordem visual 1, 2, 3, 4
+            movies.sort((a, b) => a.id.localeCompare(b.id));
+
+            movies.forEach((movie, index) => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-800 rounded-xl overflow-hidden border border-slate-700 flex flex-col md:flex-row";
+                
+                div.innerHTML = `
+                    <!-- Preview Imagem -->
+                    <div class="w-full md:w-40 h-40 md:h-auto relative bg-black flex-shrink-0">
+                        <img src="${movie.poster}" id="preview_${movie.id}" class="w-full h-full object-cover opacity-80">
+                        <div class="absolute top-0 left-0 bg-black/60 text-white text-xs px-2 py-1 font-bold">#${index + 1}</div>
+                    </div>
+                    
+                    <!-- Formuário -->
+                    <div class="p-4 flex-grow space-y-3">
+                        <div>
+                            <label class="text-[10px] text-slate-400 uppercase font-bold">Título</label>
+                            <input type="text" id="title_${movie.id}" value="${movie.title}" class="input-dark">
+                        </div>
+                        
+                        <div>
+                            <label class="text-[10px] text-slate-400 uppercase font-bold">Sinopse Curta</label>
+                            <input type="text" id="desc_${movie.id}" value="${movie.desc}" class="input-dark">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-[10px] text-slate-400 uppercase font-bold">URL do Poster</label>
+                                <input type="text" id="poster_${movie.id}" value="${movie.poster}" class="input-dark text-xs" onchange="document.getElementById('preview_${movie.id}').src = this.value">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400 uppercase font-bold">YouTube ID</label>
+                                <div class="flex items-center bg-slate-900 rounded border border-slate-700">
+                                    <span class="text-[10px] text-slate-500 px-2">v=</span>
+                                    <input type="text" id="trailer_${movie.id}" value="${movie.trailer}" class="bg-transparent border-none text-white text-xs w-full py-2 focus:outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button onclick="window.saveMovie('${movie.id}')" class="bg-cinema-gold hover:bg-yellow-500 text-black font-bold text-xs py-2 px-6 rounded uppercase tracking-wide">
+                                Guardar Alterações
+                            </button>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        // --- AÇÕES ---
+
+        // Guardar Filme Individual
+        window.saveMovie = async (id) => {
+            const title = document.getElementById(`title_${id}`).value;
+            const desc = document.getElementById(`desc_${id}`).value;
+            const poster = document.getElementById(`poster_${id}`).value;
+            const trailer = document.getElementById(`trailer_${id}`).value;
+
+            try {
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'movies', id);
+                await updateDoc(ref, { 
+                    title, desc, poster, trailer 
+                });
+                showToast(`Filme "${title}" atualizado!`);
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao guardar.");
+            }
+        };
+
+        // Iniciar Nova Votação (Timer)
+        window.startNewVoting = async () => {
+            const mins = parseInt(document.getElementById('timerMinutes').value);
+            if (!mins) return;
+
+            const now = new Date().getTime();
+            const endTime = now + (mins * 60 * 1000);
+
+            try {
+                const timerRef = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'timer');
+                await setDoc(timerRef, { endTime: endTime });
+                showToast(`Votação iniciada por ${mins} minutos!`);
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao iniciar votação.");
+            }
+        };
+
+        // Zerar Votos
+        window.resetAllVotes = async () => {
+            if (!confirm("TEM A CERTEZA? Isto apagará todos os votos.")) return;
+
+            try {
+                const batch = writeBatch(db);
+                movies.forEach(m => {
+                    const ref = doc(db, 'artifacts', appId, 'public', 'data', 'movies', m.id);
+                    batch.update(ref, { count: 0 });
+                });
+                
+                // Opcional: Apagar votos individuais dos utilizadores seria ideal, mas requer query complexa.
+                // Como regra simples, zeramos a contagem pública.
+                
+                await batch.commit();
+                showToast("Todos os votos foram zerados.");
+            } catch (e) {
+                console.error(e);
+                alert("Erro ao zerar.");
+            }
+        };
+
+        // UI Utils
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const txt = document.getElementById('toastMsg');
+            txt.innerText = msg;
+            toast.classList.remove('translate-y-20');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20');
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

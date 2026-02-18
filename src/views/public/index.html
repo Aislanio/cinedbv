@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CINEDBV - Clube Pedras Preciosas</title>
+    
+    <!-- Bibliotecas de Estilo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Configuração do Tailwind -->   
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { cinema: { red: '#8B0000', dark: '#1a0202', gold: '#FFD700' } },
+                    animation: { 
+                        'fire-intense': 'fireIntense 1.5s infinite alternate',
+                        'bounce-short': 'bounceShort 0.5s ease-in-out'
+                    },
+                    keyframes: {
+                        fireIntense: {
+                            '0%': { boxShadow: '0 0 20px #ff0000', borderColor: '#ffae00', transform: 'scale(1.02)' },
+                            '100%': { boxShadow: '0 0 40px #ff0000', borderColor: '#ffd000', transform: 'scale(1.05)' }
+                        },
+                        ticketPop: {
+                            '0%': { transform: 'scale(0) rotate(-30deg)', opacity: '0' },
+                            '20%': { transform: 'scale(1.1) rotate(0deg)', opacity: '1' },
+                            '50%': { transform: 'scale(1) rotate(0deg)', opacity: '1' },
+                            '100%': { transform: 'translate(30vw, -45vh) scale(0.1) rotate(45deg)', opacity: '0' }
+                        },
+                        bounceShort: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-5px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Poppins:wght@300;400;700;900&display=swap');
+        body { background: radial-gradient(circle at center, #4a0404 0%, #000000 100%); font-family: 'Poppins', sans-serif; overflow-x: hidden; }
+        h1, h2, .font-anton { font-family: 'Anton', sans-serif; letter-spacing: 1px; }
+        
+        .glass-card { background: rgba(20, 0, 0, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
+        .golden-ticket { background: linear-gradient(135deg, #FFD700, #FDB931); color: #4a0404; clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 80%, 5% 75%, 0% 70%, 0% 30%, 5% 25%, 0% 20%); position: relative; }
+        .winner-fire { animation: fireIntense 1.5s infinite alternate; z-index: 30 !important; border: 2px solid #FFD700; }
+        
+        .loader-spin { border: 4px solid rgba(255,255,255,0.1); border-left-color: #FFD700; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s infinite linear; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* --- ANIMAÇÃO DO TICKET --- */
+        @keyframes ticketPop {
+            0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+            20% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+            50% { transform: scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(30vw, -45vh) scale(0.1) rotate(45deg); opacity: 0; }
+        }
+        
+        .run-ticket-animation {
+            animation: ticketPop 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen flex flex-col">
+
+    <!-- Loading Inicial -->
+    <div id="loadingScreen" class="fixed inset-0 z-[9999] bg-[#2a0202] flex flex-col items-center justify-center transition-transform duration-1000">
+        <div class="text-6xl mb-4 animate-bounce">🍿</div>
+        <div class="loader-spin mb-6"></div>
+        <h2 class="text-3xl text-cinema-gold font-anton uppercase">A preparar sala...</h2>
+    </div>
+
+    <!-- Background Animado -->
+    <div class="fixed inset-0 pointer-events-none z-0 opacity-20">
+        <div class="absolute top-10 left-10 text-4xl animate-bounce" style="animation-duration: 3s">🍿</div>
+        <div class="absolute bottom-20 right-20 text-5xl animate-bounce" style="animation-duration: 4s">🎬</div>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="relative z-40 border-b border-white/10 bg-black/80 backdrop-blur-md sticky top-0 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-film text-cinema-gold text-xl"></i>
+                <h1 class="text-2xl font-anton hidden sm:block">CINEDBV</h1>
+            </div>
+            
+            <!-- Cronómetro -->
+            <div class="flex flex-col items-center">
+                <div class="text-[10px] uppercase text-cinema-gold font-bold">Encerra em</div>
+                <div class="flex items-center gap-2 bg-black/50 border border-cinema-gold px-3 py-1 rounded font-anton text-xl" id="countdownDisplay">--:--</div>
+            </div>
+
+            <!-- Área do Utilizador -->
+            <div class="flex items-center gap-4">
+                <div id="userWallet" onclick="window.showMyTicket()" class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 hover:bg-white/10 cursor-pointer transition">
+                    <i class="fa-solid fa-ticket text-cinema-gold"></i>
+                    <span id="userStatus" class="text-xs font-bold text-slate-300">Sem Ticket</span>
+                </div>
+                
+                <button id="loginBtn" onclick="window.toggleModal('loginModal', true)" class="flex items-center gap-2 text-xs font-bold bg-white/10 hover:bg-white/20 px-4 py-1.5 rounded-full border border-dashed border-white/30 transition shadow-lg">
+                    <i class="fa-regular fa-user-circle text-lg text-cinema-gold"></i> ENTRAR
+                </button>
+
+                <img id="userAvatar" onclick="window.logout()" class="w-9 h-9 rounded-full border-2 border-cinema-gold hidden cursor-pointer hover:scale-110 transition shadow-[0_0_10px_rgba(255,215,0,0.3)]" src="" title="Sair da Sessão">
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <main class="relative z-10 flex-grow max-w-7xl mx-auto px-4 py-8 w-full">
+        <div class="text-center mb-10">
+            <h2 class="text-4xl md:text-5xl font-anton mb-2 uppercase drop-shadow-lg">Sessão da Noite</h2>
+            <div class="h-1 w-20 bg-cinema-gold mx-auto mb-6 rounded-full"></div>
+            
+            <!-- BOTÃO DE CONVITE MELHORADO -->
+            <div id="inviteCodeDisplay" class="hidden text-center animate-bounce-short">
+                <button onclick="window.copyInvite()" class="group relative bg-black/60 border border-cinema-gold/50 hover:border-cinema-gold hover:bg-cinema-gold/10 px-8 py-4 rounded-xl transition-all duration-300 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,215,0,0.1)] hover:shadow-[0_0_30px_rgba(255,215,0,0.3)]">
+                    
+                    <!-- Tooltip "Copiado!" -->
+                    <div id="copyFeedback" class="absolute -top-10 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded shadow-lg opacity-0 transition-all duration-300 translate-y-2 pointer-events-none">
+                        <i class="fa-solid fa-check mr-1"></i> Copiado!
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <div class="text-left">
+                            <p class="text-[10px] uppercase text-slate-400 font-bold tracking-[0.2em] mb-1">Teu Código de Acesso</p>
+                            <div class="flex items-center gap-3">
+                                <span id="myCode" class="text-3xl font-black text-cinema-gold font-mono tracking-widest drop-shadow-md">---</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Divisória -->
+                        <div class="w-px h-10 bg-white/10"></div>
+                        
+                        <!-- Ícone de Ação -->
+                        <div class="flex flex-col items-center gap-1 text-slate-400 group-hover:text-white transition-colors">
+                            <i class="fa-regular fa-copy text-2xl"></i>
+                            <span class="text-[10px] font-bold uppercase">Copiar</span>
+                        </div>
+                    </div>
+                </button>
+                <p class="text-slate-500 text-xs mt-3">Clica para copiar o convite e mandar aos amigos! 🚀</p>
+            </div>
+            
+            <div id="votingClosedBanner" class="hidden mt-4 bg-red-900/80 border border-red-500 px-6 py-2 rounded inline-block animate-pulse font-bold">
+                <i class="fa-solid fa-lock mr-2"></i> VOTAÇÃO ENCERRADA
+            </div>
+        </div>
+
+        <div id="moviesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10">
+            <!-- Grid injetada via JS -->
+        </div>
+
+        <section class="mt-12 border-t border-white/10 pt-8">
+            <h3 class="text-2xl font-anton text-center mb-8 text-cinema-gold uppercase">Top Recrutadores</h3>
+            <div id="leaderboardGrid" class="flex flex-col gap-4 max-w-3xl mx-auto"></div>
+        </section>
+    </main>
+
+    <!-- Overlays e Modais -->
+    
+    <!-- 1. Animação Ticket (Overlay) -->
+    <div id="ticketAnimationOverlay" class="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none hidden bg-black/60 backdrop-blur-sm">
+        <div id="animatedTicket" class="golden-ticket w-[300px] h-[150px] md:w-[500px] md:h-[220px] flex rounded-lg shadow-2xl opacity-0">
+            <div class="flex-grow flex flex-col justify-center items-center border-r-2 border-dashed border-cinema-dark/20 text-center">
+                <h2 class="text-2xl font-anton text-cinema-dark">TICKET EMITIDO!</h2>
+                <p class="text-cinema-dark/80 text-sm font-bold">Aproveite o filme</p>
+            </div>
+            <div class="w-16 bg-white/10 flex items-center justify-center"><span class="text-cinema-dark font-bold -rotate-90 text-xs tracking-widest">ADMIT ONE</span></div>
+        </div>
+    </div>
+
+    <!-- 2. Login Modal -->
+    <div id="loginModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-zinc-900 border border-white/10 p-8 rounded-2xl w-full max-w-sm text-center shadow-2xl">
+            <h3 class="text-2xl font-bold text-white mb-2">Entrar no Clube</h3>
+            <div class="mb-6 text-left">
+                <label class="text-xs text-slate-500 uppercase font-bold ml-1">Código Convite (Opcional)</label>
+                <div class="flex items-center mt-2 bg-black/50 border border-white/10 rounded focus-within:border-cinema-gold">
+                    <span class="text-cinema-gold font-bold font-mono px-3 select-none">DBV-</span>
+                    <input type="text" id="inviteCodeSuffix" placeholder="XXXX" maxlength="6" class="bg-transparent text-white w-full py-2 focus:outline-none uppercase font-mono tracking-widest">
+                </div>
+            </div>
+            <div id="googleSignInDiv" class="flex justify-center w-full mt-2"></div>
+            <button onclick="window.toggleModal('loginModal', false)" class="mt-4 text-xs text-slate-500 underline">Cancelar</button>
+        </div>
+    </div>
+
+    <!-- 3. Ticket View Modal (QR) -->
+    <div id="viewTicketModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-md hidden">
+        <div class="relative">
+            <button onclick="window.toggleModal('viewTicketModal', false)" class="absolute -top-8 right-0 text-white hover:text-red-500"><i class="fa-solid fa-times"></i> Fechar</button>
+            <div class="golden-ticket w-[340px] md:w-[600px] h-[200px] flex rounded-lg shadow-2xl">
+                <div class="flex-grow p-6 relative z-10 border-r-2 border-dashed border-cinema-dark/20 flex flex-col justify-between">
+                    <h2 id="ticketTitle" class="text-2xl md:text-3xl font-anton text-cinema-dark leading-none">FILME</h2>
+                    <div class="flex justify-between items-end text-cinema-dark">
+                        <div><span class="text-[10px] uppercase font-bold opacity-60">Nome</span><div id="ticketUser" class="font-bold truncate w-24">User</div></div>
+                        <div><span class="text-[10px] uppercase font-bold opacity-60">Código</span><div id="ticketCode" class="font-mono font-bold">---</div></div>
+                    </div>
+                </div>
+                <div class="w-[140px] p-4 flex items-center justify-center bg-black/5 relative z-10">
+                    <img id="ticketQr" class="mix-blend-multiply w-full" src="">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Trailer Modal -->
+    <div id="trailerModal" onclick="if(event.target===this) window.closeTrailer()" class="fixed inset-0 z-[70] bg-black/95 backdrop-blur-md hidden flex items-center justify-center transition-opacity duration-300 opacity-0">
+    <div class="relative w-full max-w-5xl mx-4 bg-black border border-white/20 rounded-lg overflow-hidden">
+        <button onclick="window.closeTrailer()" class="absolute top-4 right-4 z-50 text-white hover:text-red-500 text-2xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center">
+            <i class="fa-solid fa-times"></i>
+        </button>
+
+        <div class="relative pt-[56.25%] bg-black">
+            <div id="loadingSpinner" class="absolute inset-0 flex flex-col items-center justify-center z-10 text-white">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600 mb-2"></div>
+                <p class="text-sm font-light">Carregando trailer...</p>
+            </div>
+
+            <iframe id="youtubeFrame" class="absolute inset-0 w-full h-full opacity-0 transition-opacity duration-500" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+    
+    <script src="/js/script.js"></script>
+</body>
+</html>
