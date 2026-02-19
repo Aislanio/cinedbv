@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
     timestamps: true 
 });
 
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function() {
     if (!this.myCode) {
         let isUnique = false;
         let attempts = 0;
@@ -44,7 +44,7 @@ userSchema.pre('save', async function(next) {
             attempts++;
         }
     }
-    next();
+    
 });
 
 export default mongoose.models.User || mongoose.model('User', userSchema);

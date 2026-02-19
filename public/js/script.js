@@ -59,6 +59,7 @@ async function fetchMovies() {
         const res = await fetch('/auth/movies');
         const data = await res.json();
         if (data.success) state.movies = data.movies;
+        console.log(data.movies)
     } catch (error) {
         console.error("Erro ao carregar filmes", error);
     }
@@ -195,9 +196,6 @@ window.vote = async (movieId) => {
         console.log(data)
         if (data.success) {
             playTicketAnimation();
-
-            // Atualiza o estado local para refletir o voto imediatamente
-            state.user.votedMovieId = movieId;
             // Atualiza os filmes e a tela
             await fetchMovies();
             renderMovies();
@@ -387,7 +385,7 @@ function playTicketAnimation() {
 
 window.copyInvite = () => {
     if(!state.user || !state.user.myCode) return;
-    const textToCopy = `🍿 *CINEDBV - Clube Pedras Preciosas* 🍿\n\nVem ajudar a escolher o filme da nossa próxima sessão! 🎬\n\n🎟️ Entra com o meu código VIP: *${state.user.myCode}*\n\n👉 Acede aqui: ${window.location.href}`;
+    const textToCopy = `🍿 *CINEDBV - Clube Pedras Preciosas* 🍿\n\nVem ajudar a escolher o filme da nossa próxima sessão! 🎬\n\n🎟️ Entra com o meu código VIP: *${state.user.myCode}*\n\n👉 link da votação aqui: https://cinedbv.vercel.app/`;
     const textarea = document.createElement('textarea');
     textarea.value = textToCopy;
     document.body.appendChild(textarea);

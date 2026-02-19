@@ -176,10 +176,18 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
         }
 
         // 4. Lógica de Troca (Se já votou em outro antes)
+        console.log("user:")
+        console.log(user)
         if (user.votedMovieId) {
+              console.log("REMOVER VOTO")
             // Remove o voto do filme antigo (usando field 'votes' ou 'voteCount' conforme seu Schema)
-            await Movie.findByIdAndUpdate(user.votedMovieId, { $inc: { voteCount: -1 } });
+             const filmeAntigo = await Movie.findById(user.votedMovieId);
+             if(filmeAntigo.voteCount >0){
+                 await Movie.findByIdAndUpdate(user.votedMovieId, { $inc: { voteCount: -1 } });
+             }
+           
         }
+         console.log("filmeNovo:")
         console.log(novoFilme);
         // 5. Salvar novo estado no Usuário
         const oldMovieId = user.votedMovieId;
@@ -187,11 +195,21 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
         user.voteTimestamp = new Date();
         await user.save();
 
-        // 6. Incrementar no Novo Filme
-        await Movie.findByIdAndUpdate(novoFilme._id, { $inc: { voteCount: 1 } });
+        console.log('user DEPOIS:')
+        console.log(user)
 
+        // 6. Incrementar no Novo Filme
+       // Incrementa o contador E adiciona o ID do usuário à lista de votantes
+        await Movie.findByIdAndUpdate(
+            novoFilme._id, 
+            { 
+                $inc: { voteCount: 1 },         // Soma 1 ao número
+                $push: { voters: user._id }     // Adiciona o ID ao array
+            }
+        );
+      
         res.status(200).json({ 
-            success: true, 
+            success: true,
             message: oldMovieId ? `Voto alterado para: ${novoFilme.title}` : `Voto registrado: ${novoFilme.title}`,
             movieTitle: novoFilme.title 
         });
