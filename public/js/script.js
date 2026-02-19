@@ -41,6 +41,7 @@ async function checkSession() {
         
         if (data.success) {
             state.user = data.user;
+            updateWalletUI();
         } else {
             state.user = null;
         }
@@ -198,6 +199,7 @@ window.vote = async (movieId) => {
             playTicketAnimation();
             // Atualiza os filmes e a tela
             await fetchMovies();
+            await checkSession();
             renderMovies();
             updateWalletUI();
         } else {
@@ -334,7 +336,10 @@ function checkLoginState() {
 }
 
 function updateWalletUI() {
+    console.log(state.user && state.user.votedMovieId);
+
     if (state.user && state.user.votedMovieId) {
+        console.log("MUDOUUUUUUUUUUUU");
         const w = document.getElementById('userWallet');
         w.classList.remove('hidden');
         w.classList.add('border-cinema-gold', 'bg-white/10');
