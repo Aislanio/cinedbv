@@ -227,28 +227,29 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
 // ==========================================
 authRouter.get('/config', async (req, res) => {
     try {
-        // 1. Define a data de hoje às 10h (Horário de Brasília)
-        const dataHoje10h = new Date('2026-02-21T10:00:00-03:00').getTime();
+        // 1. Define a data de encerramento para hoje às 16:00 (Horário de Brasília)
+        // ISO 8601 com offset -03:00 garante a precisão do fuso
+        const dataEncerramento = new Date('2026-05-21T16:00:00-03:00').getTime();
 
         // 2. Busca e JÁ ATUALIZA para garantir que o valor seja esse
         let config = await Config.findByIdAndUpdate(
             'timer', 
-            { endTime: dataHoje10h }, 
-            { upsert: true, new: true } // Se não existir, cria. Se existir, atualiza.
+            { endTime: dataEncerramento }, 
+            { upsert: true, new: true } // Se não existir, cria. Se existir, retorna o novo.
         );
         
         res.status(200).json({ 
             success: true, 
             config: {
                 endTime: config.endTime,
+                // A votação só está aberta se o momento atual for anterior ao endTime
                 votingOpen: config.endTime > Date.now() 
             }
         });
     } catch (error) {
-        // ... erro
+        res.status(500).json({ success: false, message: error.message });
     }
 });
-
 
 // Exporta O ÚNICO router que será usado no server principal (app.js ou index.js raiz)
 export default authRouter;
