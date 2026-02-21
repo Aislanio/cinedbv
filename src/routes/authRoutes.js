@@ -227,22 +227,21 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
 // ==========================================
 authRouter.get('/config', async (req, res) => {
     try {
-        // 1. Define a data de encerramento para hoje às 16:00 (Horário de Brasília)
-        // ISO 8601 com offset -03:00 garante a precisão do fuso
-        const dataEncerramento = new Date('2026-05-21T16:00:00-03:00').getTime();
+        // 1. Define a data de encerramento para HOJE (21 de Fevereiro de 2026) às 16:00
+        // O fuso -03:00 garante que o horário de Brasília seja respeitado
+        const dataEncerramento = new Date('2026-02-21T16:00:00-03:00').getTime();
 
-        // 2. Busca e JÁ ATUALIZA para garantir que o valor seja esse
+        // 2. Atualiza o banco com a data correta de Fevereiro
         let config = await Config.findByIdAndUpdate(
             'timer', 
             { endTime: dataEncerramento }, 
-            { upsert: true, new: true } // Se não existir, cria. Se existir, retorna o novo.
+            { upsert: true, new: true }
         );
         
         res.status(200).json({ 
             success: true, 
             config: {
                 endTime: config.endTime,
-                // A votação só está aberta se o momento atual for anterior ao endTime
                 votingOpen: config.endTime > Date.now() 
             }
         });
