@@ -220,7 +220,7 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
 });
 
 // Função para popular o banco de dados se estiver vazio
-const seedMovies = async () => {
+/*const seedMovies = async () => {
     try {
         const count = await Movie.countDocuments();
         
@@ -256,7 +256,7 @@ const seedMovies = async () => {
 };
 
 // Executa a função
-seedMovies();
+seedMovies();*/
 
 // ==========================================
 // 3. ROTAS DE CONFIGURAÇÃO (CRONÔMETRO)
