@@ -227,23 +227,15 @@ authRouter.post('/movies/vote', verifyToken, async (req, res) => {
 // ==========================================
 authRouter.get('/config', async (req, res) => {
     try {
-        let config = await Config.findById('timer');
-        
-        if (!config) {
-            // Define a data exata: Ano-Mês-Dia T Hora:Minuto:Segundo -FusoHorário
-            // Exemplo: Sábado, 21 de Fevereiro de 2026 às 21:30 (horário de Brasília -03:00)
-            const dataFim = new Date('2026-02-21T21:30:00-03:00'); 
-            
-            // Se preferir de manhã (09:30), mude para: '2026-02-21T09:30:00-03:00'
+        // 1. Define a data de hoje às 10h (Horário de Brasília)
+        const dataHoje10h = new Date('2026-02-21T10:00:00-03:00').getTime();
 
-            const endTimeMs = dataFim.getTime(); // Converte a data para milissegundos
-            
-            config = new Config({ 
-                _id: 'timer', 
-                endTime: endTimeMs 
-            });
-            await config.save();
-        }
+        // 2. Busca e JÁ ATUALIZA para garantir que o valor seja esse
+        let config = await Config.findByIdAndUpdate(
+            'timer', 
+            { endTime: dataHoje10h }, 
+            { upsert: true, new: true } // Se não existir, cria. Se existir, atualiza.
+        );
         
         res.status(200).json({ 
             success: true, 
@@ -253,8 +245,7 @@ authRouter.get('/config', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("❌ Erro na rota /config:", error.message); 
-        res.status(500).json({ success: false, error: error.message });
+        // ... erro
     }
 });
 
